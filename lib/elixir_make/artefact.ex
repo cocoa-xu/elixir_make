@@ -49,12 +49,15 @@ defmodule ElixirMake.Artefact do
     Logger.debug("Creating precompiled archive: #{archive_full_path}")
     Logger.debug("Paths to compress in priv directory: #{inspect(paths)}")
 
-    filepaths =
-      for include <- paths,
-          file <- Path.wildcard(Path.join(app_priv, include)),
-          do: {file |> Path.relative_to(app_priv) |> String.to_charlist(), File.read!(file)}
+    :ok =
+      File.cd!(app_priv, fn ->
+        filepaths =
+          Enum.reduce(paths, [], fn include, filepaths ->
+            Enum.map(Path.wildcard(include), &to_charlist/1) ++ filepaths
+          end)
 
-    :ok = :erl_tar.create(archive_full_path, filepaths, [:compressed])
+        :erl_tar.create(archive_full_path, filepaths, [:compressed])
+      end)
 
     {:ok, algo, checksum} =
       ElixirMake.Artefact.compute_checksum(archive_full_path, ElixirMake.Artefact.checksum_algo())
